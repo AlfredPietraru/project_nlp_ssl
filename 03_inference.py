@@ -48,7 +48,7 @@ def load_model(num_labels):
         adapter_config = json.load(f)
 
     base_model_name = adapter_config["base_model_name_or_path"]
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -56,7 +56,9 @@ def load_model(num_labels):
         base_model_name,
         num_labels=num_labels,
         torch_dtype=torch.float32,
+        trust_remote_code=True,
     )
+    base_model.config.pad_token_id = tokenizer.pad_token_id
     model = PeftModel.from_pretrained(base_model, MODEL_DIR)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

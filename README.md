@@ -216,7 +216,7 @@ Instead of fine-tuning all 66M parameters, we only train 200K LoRA weights. This
 Predict on all problems:
 ```python
 from pathlib import Path
-base_path = Path("/home/alf/nlp_ssl/cleaned_data")
+base_path = Path("cleaned_data")
 all_problems = [d.name for d in base_path.iterdir() if d.is_dir()]
 predictions = batch_predict(all_problems, base_path, model, tokenizer)
 ```

@@ -22,12 +22,14 @@ from peft import get_peft_model, LoraConfig, TaskType
 # ============================================================================
 # CONFIG
 # ============================================================================
-MODEL_NAME = "distilbert-base-uncased"  # 66M params, very fast
-BATCH_SIZE = 16
+MODEL_NAME = "Qwen/Qwen2.5-7B"
+BATCH_SIZE = 1
 LEARNING_RATE = 2e-4
 NUM_EPOCHS = 10
-MAX_LENGTH = 512
+MAX_LENGTH = 1024
 WARMUP_RATIO = 0.1
+GRADIENT_ACCUMULATION_STEPS = 16
+LORA_TARGET_MODULES = ["q_proj", "v_proj"]
 
 print(f"Config: {MODEL_NAME}, batch={BATCH_SIZE}, epochs={NUM_EPOCHS}")
 
@@ -43,6 +45,18 @@ def build_training_args(**kwargs):
 
     filtered = {key: value for key, value in normalized.items() if key in supported}
     return TrainingArguments(**filtered)
+
+
+def preferred_torch_dtype():
+    if not torch.cuda.is_available():
+        return torch.float32
+    if torch.cuda.get_device_capability(0)[0] >= 8:
+        return torch.bfloat16
+    return torch.float16
+
+
+def use_bf16():
+    return preferred_torch_dtype() == torch.bfloat16
 
 # ============================================================================
 # STEP 1: LOAD DATA
@@ -203,7 +217,7 @@ def train():
     
     # Load model & tokenizer
     print("\n[3] Loading model...")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
@@ -214,15 +228,19 @@ def train():
     model = AutoModelForSequenceClassification.from_pretrained(
         MODEL_NAME,
         num_labels=num_labels,
-        dtype=torch.float32,
+        torch_dtype=preferred_torch_dtype(),
+        trust_remote_code=True,
     )
+    model.config.pad_token_id = tokenizer.pad_token_id
+    if hasattr(model, "gradient_checkpointing_enable"):
+        model.gradient_checkpointing_enable()
     
     # Apply LoRA
     print("  Applying LoRA...")
     lora_config = LoraConfig(
         r=8,
         lora_alpha=16,
-        target_modules=["q_lin", "v_lin"],
+        target_modules=LORA_TARGET_MODULES,
         lora_dropout=0.05,
         bias="none",
         task_type=TaskType.SEQ_CLS,
@@ -254,8 +272,9 @@ def train():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         seed=42,
-        fp16=False,
-        gradient_accumulation_steps=2,
+        bf16=use_bf16(),
+        fp16=torch.cuda.is_available() and not use_bf16(),
+        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
         remove_unused_columns=False,
         label_names=["difficulty", "tags"],
     )

@@ -2,6 +2,7 @@ venv
 .codex
 cleaned_data
 *.zip
+__pycache__
 predictions.json
 model_output
 prediction_report

@@ -8,8 +8,8 @@ from collections import defaultdict
 from pathlib import Path
 
 
-BASE_PATH = Path("/home/alf/nlp_ssl/cleaned_data")
-OUTPUT_DIR = Path("/home/alf/nlp_ssl/training_data")
+BASE_PATH = Path("cleaned_data")
+OUTPUT_DIR = Path("training_data")
 SPLIT_RATIOS = {
     "train": 0.70,
     "validation": 0.15,

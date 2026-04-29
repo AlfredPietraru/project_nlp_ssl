@@ -22,14 +22,14 @@ from peft import get_peft_model, LoraConfig, TaskType
 # ============================================================================
 # CONFIG
 # ============================================================================
-MODEL_NAME = "microsoft/phi-2"  # Fast, efficient (~7B, but quantizable)
-# Alternative: "distilbert-base-uncased"  # Even smaller (~66M)
+MODEL_NAME = "Qwen/Qwen2.5-7B"
 
 MAX_LENGTH = 1024  # Truncate long texts
-BATCH_SIZE = 4  # Small batch for limited VRAM
+BATCH_SIZE = 1  # Small batch for 7B model
 LEARNING_RATE = 1e-4
 NUM_EPOCHS = 10
 WARMUP_STEPS = 100
+LORA_TARGET_MODULES = ["q_proj", "v_proj"]
 
 # ============================================================================
 # LOAD DATA
@@ -194,22 +194,24 @@ def train():
     print(f"  Model: {MODEL_NAME}")
     print(f"  Max length: {MAX_LENGTH}")
     
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
     model = AutoModelForSequenceClassification.from_pretrained(
         MODEL_NAME,
         num_labels=8,  # 8 difficulties: A-H
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+        trust_remote_code=True,
     )
+    model.config.pad_token_id = tokenizer.pad_token_id
     
     # 3. Apply LoRA
     print("\n[3/4] Applying LoRA (Parameter-Efficient Fine-Tuning)...")
     lora_config = LoraConfig(
         r=8,  # LoRA rank
         lora_alpha=16,
-        target_modules=["q_proj", "v_proj"],  # Apply to attention layers
+        target_modules=LORA_TARGET_MODULES,
         lora_dropout=0.05,
         bias="none",
         task_type=TaskType.SEQ_CLS

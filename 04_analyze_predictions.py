@@ -570,22 +570,22 @@ def main():
     parser = argparse.ArgumentParser(description="Analyze predictions.json and generate charts.")
     parser.add_argument(
         "--predictions",
-        default="/home/alf/nlp_ssl/predictions.json",
+        default="predictions.json",
         help="Path to predictions.json",
     )
     parser.add_argument(
         "--metadata",
-        default="/home/alf/nlp_ssl/cleaned_data/dataset_splits.json",
+        default="cleaned_data/dataset_splits.json",
         help="Optional ground truth metadata file",
     )
     parser.add_argument(
         "--output-dir",
-        default="/home/alf/nlp_ssl/prediction_report",
+        default="prediction_report",
         help="Directory for generated summary and graphics",
     )
     parser.add_argument(
         "--training-data",
-        default="/home/alf/nlp_ssl/training_data/train.jsonl",
+        default="training_data/train.jsonl",
         help="Training split jsonl used for training-set distribution",
     )
     args = parser.parse_args()
