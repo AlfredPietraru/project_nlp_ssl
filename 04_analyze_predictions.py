@@ -4,7 +4,9 @@ Generate summary results and graphics from predictions.json.
 Outputs:
 - summary.json with aggregate metrics
 - per_problem_comparison.jsonl with prediction vs ground truth
-- PNG charts for predicted difficulty, ground-truth difficulty, top tags, confidence distribution
+- predicted, ground-truth, and training-set difficulty distribution charts
+- predicted and ground-truth tag distribution charts for the evaluated set
+- confusion-matrix artifacts for difficulty and tags
 - Optional evaluation metrics if ground truth metadata is available
 """
 import argparse
@@ -60,6 +62,22 @@ def load_ground_truth(metadata_path):
     return truth
 
 
+def load_training_difficulty_distribution(training_path):
+    """Load difficulty counts from training_data/train.jsonl if available."""
+    training_file = Path(training_path)
+    if not training_file.exists():
+        return Counter()
+
+    difficulty_counter = Counter()
+    with open(training_file, encoding="utf-8") as f:
+        for line in f:
+            example = json.loads(line)
+            difficulty = example.get("difficulty")
+            if difficulty:
+                difficulty_counter[difficulty] += 1
+    return difficulty_counter
+
+
 def ensure_output_dir(path):
     path.mkdir(parents=True, exist_ok=True)
 
@@ -72,6 +90,22 @@ def save_bar_chart(labels, values, title, ylabel, output_path, rotate=False):
     plt.xlabel("")
     if rotate:
         plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180)
+    plt.close()
+
+
+def save_grouped_bar_chart(labels, left_values, right_values, left_name, right_name, title, ylabel, output_path):
+    positions = range(len(labels))
+    width = 0.4
+
+    plt.figure(figsize=(12, 6))
+    plt.bar([p - width / 2 for p in positions], left_values, width=width, label=left_name)
+    plt.bar([p + width / 2 for p in positions], right_values, width=width, label=right_name)
+    plt.title(title)
+    plt.ylabel(ylabel)
+    plt.xticks(list(positions), labels, rotation=45, ha="right")
+    plt.legend()
     plt.tight_layout()
     plt.savefig(output_path, dpi=180)
     plt.close()
@@ -431,7 +465,7 @@ def analyze_predictions(predictions, ground_truth):
 
 def generate_outputs(summary, difficulty_counter, true_difficulty_counter, tag_counter, true_tag_counter,
                      confidence_values, tag_count_values, difficulty_true, difficulty_pred,
-                     comparison_rows, evaluation_tags, output_dir):
+                     comparison_rows, evaluation_tags, training_difficulty_counter, output_dir):
     with open(output_dir / "summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
@@ -462,45 +496,50 @@ def generate_outputs(summary, difficulty_counter, true_difficulty_counter, tag_c
             output_dir / "ground_truth_difficulty_distribution.png",
         )
 
-    top_tags = tag_counter.most_common(15)
-    if top_tags:
+    training_difficulty_labels = [d for d in DIFFICULTY_ORDER if training_difficulty_counter.get(d, 0) > 0]
+    training_difficulty_values = [training_difficulty_counter[d] for d in training_difficulty_labels]
+    if training_difficulty_labels:
         save_bar_chart(
-            [tag for tag, _ in top_tags],
-            [count for _, count in top_tags],
-            "Top Predicted Tags",
+            training_difficulty_labels,
+            training_difficulty_values,
+            "Training Set Difficulty Distribution",
             "Problems",
-            output_dir / "top_tags.png",
+            output_dir / "training_difficulty_distribution.png",
+        )
+
+    predicted_top_tags = tag_counter.most_common(20)
+    if predicted_top_tags:
+        save_bar_chart(
+            [tag for tag, _ in predicted_top_tags],
+            [count for _, count in predicted_top_tags],
+            "Predicted Tag Distribution (Evaluated Set)",
+            "Predicted occurrences",
+            output_dir / "predicted_tag_distribution.png",
             rotate=True,
         )
 
-    true_top_tags = true_tag_counter.most_common(15)
-    if true_top_tags:
+    ground_truth_top_tags = true_tag_counter.most_common(20)
+    if ground_truth_top_tags:
         save_bar_chart(
-            [tag for tag, _ in true_top_tags],
-            [count for _, count in true_top_tags],
-            "Top Ground Truth Tags",
-            "Problems",
-            output_dir / "ground_truth_top_tags.png",
+            [tag for tag, _ in ground_truth_top_tags],
+            [count for _, count in ground_truth_top_tags],
+            "Ground Truth Tag Distribution (Evaluated Set)",
+            "True occurrences",
+            output_dir / "ground_truth_tag_distribution.png",
             rotate=True,
         )
 
-    if confidence_values:
-        save_histogram(
-            confidence_values,
-            bins=10,
-            title="Difficulty Confidence Distribution",
-            xlabel="Confidence",
-            output_path=output_dir / "difficulty_confidence_hist.png",
-        )
-
-    if tag_count_values:
-        bins = range(0, max(tag_count_values) + 2)
-        save_histogram(
-            tag_count_values,
-            bins=bins,
-            title="Predicted Tag Count per Problem",
-            xlabel="Number of Predicted Tags",
-            output_path=output_dir / "tag_count_hist.png",
+    if true_tag_counter:
+        comparison_tags = [tag for tag, _ in true_tag_counter.most_common(20)]
+        save_grouped_bar_chart(
+            comparison_tags,
+            [true_tag_counter.get(tag, 0) for tag in comparison_tags],
+            [tag_counter.get(tag, 0) for tag in comparison_tags],
+            "Ground truth",
+            "Predicted",
+            "Tag Distribution Comparison (Top 20 True Tags)",
+            "Occurrences",
+            output_dir / "tag_distribution_comparison_top20.png",
         )
 
     if difficulty_true and difficulty_pred:
@@ -544,11 +583,17 @@ def main():
         default="/home/alf/nlp_ssl/prediction_report",
         help="Directory for generated summary and graphics",
     )
+    parser.add_argument(
+        "--training-data",
+        default="/home/alf/nlp_ssl/training_data/train.jsonl",
+        help="Training split jsonl used for training-set distribution",
+    )
     args = parser.parse_args()
 
     predictions_path = Path(args.predictions)
     metadata_path = Path(args.metadata)
     output_dir = Path(args.output_dir)
+    training_data_path = Path(args.training_data)
 
     if not predictions_path.exists():
         raise FileNotFoundError(f"Predictions file not found: {predictions_path}")
@@ -559,6 +604,7 @@ def main():
         return
 
     ground_truth = load_ground_truth(metadata_path)
+    training_difficulty_counter = load_training_difficulty_distribution(training_data_path)
     ensure_output_dir(output_dir)
 
     (
@@ -589,6 +635,7 @@ def main():
         difficulty_pred,
         comparison_rows,
         evaluation_tags,
+        training_difficulty_counter,
         output_dir,
     )
 
