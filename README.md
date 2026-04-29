@@ -10,7 +10,7 @@ Fine-tune a small, efficient LLM to predict **difficulty level** (A-H) and **tag
 
 ## 📊 What This Does
 
-You have ~700 programming problems with:
+You have 1,912 programming problems with:
 - ✅ Problem description (text)
 - ✅ C++ solution code
 - ✅ Ground-truth difficulty (A-H)
@@ -66,9 +66,9 @@ python 01_prepare_data.py
 ```
 
 Output:
-- `training_data/train.jsonl` - ~450 examples
-- `training_data/validation.jsonl` - ~75 examples
-- `training_data/test.jsonl` - ~75 examples
+- `training_data/train.jsonl` - 1,338 examples
+- `training_data/validation.jsonl` - 286 examples
+- `training_data/test.jsonl` - 288 examples
 
 ### 3. Fine-Tune Model (GPU, ~1 hour)
 ```bash
@@ -169,7 +169,7 @@ MAX_LENGTH = 512                        # Reduce to 256 for speed
 
 ## 📊 Expected Results
 
-After fine-tuning on 600 examples:
+After fine-tuning on the prepared dataset:
 
 **Difficulty Classification** (8 classes: A-H)
 - Accuracy: ~75-85%
@@ -213,7 +213,7 @@ This forces the model to learn rich representations of problem semantics.
 Instead of fine-tuning all 66M parameters, we only train 200K LoRA weights. This is 333x more efficient!
 
 ### Batch Processing
-Predict on all 700 problems:
+Predict on all problems:
 ```python
 from pathlib import Path
 base_path = Path("/home/alf/nlp_ssl/cleaned_data")
