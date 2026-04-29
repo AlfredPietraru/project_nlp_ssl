@@ -1,0 +1,8 @@
+venv
+.codex
+cleaned_data
+*.zip
+predictions.json
+model_output
+prediction_report
+training_data
