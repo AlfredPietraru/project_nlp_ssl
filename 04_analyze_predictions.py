@@ -16,18 +16,14 @@ import matplotlib.pyplot as plt
 
 try:
     from sklearn.metrics import (
-        accuracy_score,
         confusion_matrix,
         f1_score,
-        multilabel_confusion_matrix,
         precision_score,
         recall_score,
     )
 except Exception:  # pragma: no cover
-    accuracy_score = None
     confusion_matrix = None
     f1_score = None
-    multilabel_confusion_matrix = None
     precision_score = None
     recall_score = None
 
@@ -251,7 +247,6 @@ def analyze_predictions(predictions, ground_truth):
 
     if evaluated_ids:
         correct = sum(int(t == p) for t, p in zip(difficulty_true, difficulty_pred))
-        difficulty_accuracy = correct / len(evaluated_ids)
         difficulty_macro_f1 = None
         difficulty_weighted_f1 = None
         tag_micro_precision = None
@@ -263,8 +258,7 @@ def analyze_predictions(predictions, ground_truth):
         difficulty_per_class = []
         tag_per_class = []
 
-        if accuracy_score is not None and f1_score is not None:
-            difficulty_accuracy = accuracy_score(difficulty_true, difficulty_pred)
+        if f1_score is not None:
             difficulty_macro_f1 = f1_score(
                 difficulty_true,
                 difficulty_pred,
@@ -284,11 +278,6 @@ def analyze_predictions(predictions, ground_truth):
                 support = sum(1 for value in difficulty_true if value == difficulty_label)
                 if support == 0:
                     continue
-                class_correct = sum(
-                    1 for true_value, pred_value in zip(difficulty_true, difficulty_pred)
-                    if true_value == difficulty_label and pred_value == difficulty_label
-                )
-                class_accuracy = class_correct / support if support else 0.0
                 class_f1 = f1_score(
                     difficulty_true,
                     difficulty_pred,
@@ -299,8 +288,6 @@ def analyze_predictions(predictions, ground_truth):
                 difficulty_per_class.append({
                     "difficulty": difficulty_label,
                     "support": support,
-                    "correct": class_correct,
-                    "accuracy": class_accuracy,
                     "f1": class_f1,
                 })
 
@@ -346,8 +333,6 @@ def analyze_predictions(predictions, ground_truth):
                 true_column = [row[index] for row in tag_true_vectors]
                 pred_column = [row[index] for row in tag_pred_vectors]
                 support = sum(true_column)
-                correct = sum(int(true_value == pred_value) for true_value, pred_value in zip(true_column, pred_column))
-                tag_accuracy = correct / len(true_column) if true_column else 0.0
                 tag_f1 = f1_score(true_column, pred_column, zero_division=0)
 
                 tp = sum(1 for true_value, pred_value in zip(true_column, pred_column) if true_value == 1 and pred_value == 1)
@@ -358,8 +343,6 @@ def analyze_predictions(predictions, ground_truth):
                 tag_per_class.append({
                     "tag": tag_name,
                     "support": support,
-                    "correct": correct,
-                    "accuracy": tag_accuracy,
                     "f1": tag_f1,
                     "tp": tp,
                     "fp": fp,
@@ -371,7 +354,6 @@ def analyze_predictions(predictions, ground_truth):
             "num_evaluated": len(evaluated_ids),
             "difficulty_correct_count": correct,
             "difficulty_incorrect_count": len(evaluated_ids) - correct,
-            "difficulty_accuracy": difficulty_accuracy,
             "difficulty_error_count": len(evaluated_ids) - correct,
             "difficulty_macro_f1": difficulty_macro_f1,
             "difficulty_weighted_f1": difficulty_weighted_f1,
@@ -406,7 +388,6 @@ def analyze_predictions(predictions, ground_truth):
         }
         summary["evaluation"] = evaluation
         summary["headline_metrics"] = {
-            "difficulty_accuracy": evaluation["difficulty_accuracy"],
             "difficulty_macro_f1": evaluation["difficulty_macro_f1"],
             "difficulty_weighted_f1": evaluation["difficulty_weighted_f1"],
             "tag_micro_f1": evaluation["tag_micro_f1"],
