@@ -1,0 +1,1318 @@
+{
+  "config": {
+    "dataset_root": "augmented_data",
+    "output_dir": "rerun_augmented_cap250",
+    "embedding_model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "running_mode": "DESCRIPTION_AND_SOLUTION",
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "hidden_dim": 256,
+    "dropout": 0.2,
+    "num_epochs": 40,
+    "validation_ratio": 0.15,
+    "random_seed": 42,
+    "tag_threshold": 0.5,
+    "num_workers": 0,
+    "difficulty_loss_weight": 1.0,
+    "tags_loss_weight": 0.5,
+    "embedding_max_length": 512,
+    "device": null,
+    "difficulty_loss_type": "cross_entropy",
+    "tags_loss_type": "weighted_bce",
+    "max_difficulty_class_weight": 10.0,
+    "max_tag_pos_weight": 20.0,
+    "max_train_examples_per_difficulty": 250,
+    "early_stopping_patience": 5,
+    "early_stopping_min_delta": 0.01,
+    "merge_gh_into_f": false,
+    "unfreeze_top_n_transformer_layers": 0,
+    "encoder_learning_rate": 1e-05
+  },
+  "running_mode": "DESCRIPTION_AND_SOLUTION",
+  "merge_gh_into_f": false,
+  "unfreeze_top_n_transformer_layers": 0,
+  "input_dim": 384,
+  "embedding_model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "requested_max_length": 512,
+  "effective_max_length": 512,
+  "max_supported_length": 512,
+  "label_encoder": {
+    "difficulties": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H"
+    ],
+    "tags": [
+      "2-sat",
+      "binary search",
+      "bitmasks",
+      "brute force",
+      "chinese remainder theorem",
+      "combinatorics",
+      "constructive algorithms",
+      "data structures",
+      "dfs and similar",
+      "divide and conquer",
+      "dp",
+      "dsu",
+      "expression parsing",
+      "fft",
+      "flows",
+      "games",
+      "geometry",
+      "graph matchings",
+      "graphs",
+      "greedy",
+      "hashing",
+      "implementation",
+      "math",
+      "matrices",
+      "meet-in-the-middle",
+      "number theory",
+      "probabilities",
+      "schedules",
+      "shortest paths",
+      "sortings",
+      "string suffix structures",
+      "strings",
+      "ternary search",
+      "trees",
+      "two pointers"
+    ]
+  },
+  "label_statistics": {
+    "difficulty_counts": [
+      212,
+      212,
+      212,
+      212,
+      203,
+      74,
+      25,
+      18
+    ],
+    "tag_positive_counts": [
+      3,
+      109,
+      37,
+      165,
+      2,
+      67,
+      113,
+      182,
+      95,
+      25,
+      265,
+      39,
+      14,
+      3,
+      15,
+      25,
+      49,
+      9,
+      89,
+      235,
+      36,
+      348,
+      189,
+      13,
+      6,
+      53,
+      22,
+      2,
+      32,
+      102,
+      22,
+      91,
+      4,
+      65,
+      55
+    ],
+    "num_examples": 1168
+  },
+  "difficulty_class_weights": [
+    0.6886792778968811,
+    0.6886792778968811,
+    0.6886792778968811,
+    0.6886792778968811,
+    0.7192118167877197,
+    1.9729729890823364,
+    5.839999675750732,
+    8.111111640930176
+  ],
+  "tag_pos_weights": [
+    20.0,
+    9.715596199035645,
+    20.0,
+    6.078787803649902,
+    20.0,
+    16.432836532592773,
+    9.336282730102539,
+    5.4175825119018555,
+    11.294736862182617,
+    20.0,
+    3.4075472354888916,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    12.123595237731934,
+    3.970212697982788,
+    20.0,
+    2.3563218116760254,
+    5.179893970489502,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    20.0,
+    10.450980186462402,
+    20.0,
+    11.835165023803711,
+    20.0,
+    16.96923065185547,
+    20.0
+  ],
+  "best_validation_loss": 2.176559391744894,
+  "best_epoch": 13,
+  "stopped_epoch": 18,
+  "history": [
+    {
+      "epoch": 1,
+      "train": {
+        "loss": 2.4515918966842025,
+        "difficulty_accuracy": 0.1832191780821918,
+        "difficulty_macro_f1": 0.0762605410186052,
+        "tags_micro_precision": 0.10442217999654517,
+        "tags_micro_recall": 0.46842309182487407,
+        "tags_micro_f1": 0.17077477222967724,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.06132075471698113,
+          "B": 0.12264150943396226,
+          "C": 0.009433962264150943,
+          "D": 0.8066037735849056,
+          "E": 0.0049261083743842365,
+          "F": 0.0,
+          "G": 0.04,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.348816149607654,
+        "difficulty_accuracy": 0.22274881516587677,
+        "difficulty_macro_f1": 0.11139931449780337,
+        "tags_micro_precision": 0.15529753265602322,
+        "tags_micro_recall": 0.4533898305084746,
+        "tags_micro_f1": 0.23135135135135138,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.05263157894736842,
+          "B": 0.7368421052631579,
+          "C": 0.0,
+          "D": 0.2894736842105263,
+          "E": 0.16666666666666666,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 2,
+      "train": {
+        "loss": 2.303091663203827,
+        "difficulty_accuracy": 0.2482876712328767,
+        "difficulty_macro_f1": 0.15094500199690247,
+        "tags_micro_precision": 0.12442281292899039,
+        "tags_micro_recall": 0.3862843858969392,
+        "tags_micro_f1": 0.1882197470266188,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.4481132075471698,
+          "B": 0.2028301886792453,
+          "C": 0.09433962264150944,
+          "D": 0.1320754716981132,
+          "E": 0.5123152709359606,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.3073206230362446,
+        "difficulty_accuracy": 0.24170616113744076,
+        "difficulty_macro_f1": 0.1352881096884076,
+        "tags_micro_precision": 0.15910629654705485,
+        "tags_micro_recall": 0.4978813559322034,
+        "tags_micro_f1": 0.24114930733709597,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.4473684210526316,
+          "B": 0.2631578947368421,
+          "C": 0.5789473684210527,
+          "D": 0.02631578947368421,
+          "E": 0.027777777777777776,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 3,
+      "train": {
+        "loss": 2.2442417275415707,
+        "difficulty_accuracy": 0.2902397260273973,
+        "difficulty_macro_f1": 0.18357792567789982,
+        "tags_micro_precision": 0.17504511472028875,
+        "tags_micro_recall": 0.5261526540100736,
+        "tags_micro_f1": 0.2626946513202438,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6179245283018868,
+          "B": 0.24056603773584906,
+          "C": 0.20754716981132076,
+          "D": 0.32075471698113206,
+          "E": 0.22167487684729065,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.270703513475391,
+        "difficulty_accuracy": 0.26540284360189575,
+        "difficulty_macro_f1": 0.16555594596256928,
+        "tags_micro_precision": 0.1647482014388489,
+        "tags_micro_recall": 0.4851694915254237,
+        "tags_micro_f1": 0.2459720730397422,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5526315789473685,
+          "B": 0.10526315789473684,
+          "C": 0.10526315789473684,
+          "D": 0.2631578947368421,
+          "E": 0.4722222222222222,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 4,
+      "train": {
+        "loss": 2.185333202963006,
+        "difficulty_accuracy": 0.3176369863013699,
+        "difficulty_macro_f1": 0.17403725885846102,
+        "tags_micro_precision": 0.16695081967213116,
+        "tags_micro_recall": 0.4932196822936846,
+        "tags_micro_f1": 0.2494611013129532,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7028301886792453,
+          "B": 0.05188679245283019,
+          "C": 0.18396226415094338,
+          "D": 0.12264150943396226,
+          "E": 0.7192118226600985,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.2406036661699487,
+        "difficulty_accuracy": 0.2890995260663507,
+        "difficulty_macro_f1": 0.17583407303126516,
+        "tags_micro_precision": 0.1767515923566879,
+        "tags_micro_recall": 0.4703389830508475,
+        "tags_micro_f1": 0.2569444444444445,
+        "tags_subset_accuracy": 0.004739336492890996,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5789473684210527,
+          "B": 0.2631578947368421,
+          "C": 0.07894736842105263,
+          "D": 0.5526315789473685,
+          "E": 0.1388888888888889,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 5,
+      "train": {
+        "loss": 2.140878781880418,
+        "difficulty_accuracy": 0.3270547945205479,
+        "difficulty_macro_f1": 0.20049270060124721,
+        "tags_micro_precision": 0.17861975642760486,
+        "tags_micro_recall": 0.5114296784192174,
+        "tags_micro_f1": 0.26476782669742255,
+        "tags_subset_accuracy": 0.0008561643835616438,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6462264150943396,
+          "B": 0.19339622641509435,
+          "C": 0.1179245283018868,
+          "D": 0.49528301886792453,
+          "E": 0.3645320197044335,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.2187793424344178,
+        "difficulty_accuracy": 0.2559241706161137,
+        "difficulty_macro_f1": 0.14656378508850348,
+        "tags_micro_precision": 0.17040054310930075,
+        "tags_micro_recall": 0.5317796610169492,
+        "tags_micro_f1": 0.2580976863753213,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5789473684210527,
+          "B": 0.07894736842105263,
+          "C": 0.5,
+          "D": 0.02631578947368421,
+          "E": 0.25,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 6,
+      "train": {
+        "loss": 2.096948646519282,
+        "difficulty_accuracy": 0.348458904109589,
+        "difficulty_macro_f1": 0.22665432823461373,
+        "tags_micro_precision": 0.18250950570342206,
+        "tags_micro_recall": 0.576520728399845,
+        "tags_micro_f1": 0.2772498602571269,
+        "tags_subset_accuracy": 0.0008561643835616438,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6179245283018868,
+          "B": 0.29245283018867924,
+          "C": 0.33490566037735847,
+          "D": 0.24528301886792453,
+          "E": 0.4482758620689655,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.2090599344804955,
+        "difficulty_accuracy": 0.25118483412322273,
+        "difficulty_macro_f1": 0.13877314814814815,
+        "tags_micro_precision": 0.18523985239852397,
+        "tags_micro_recall": 0.5317796610169492,
+        "tags_micro_f1": 0.2747673782156541,
+        "tags_subset_accuracy": 0.004739336492890996,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6578947368421053,
+          "B": 0.13157894736842105,
+          "C": 0.0,
+          "D": 0.39473684210526316,
+          "E": 0.2222222222222222,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 7,
+      "train": {
+        "loss": 2.058075039354089,
+        "difficulty_accuracy": 0.3553082191780822,
+        "difficulty_macro_f1": 0.21884029731945753,
+        "tags_micro_precision": 0.18046709129511676,
+        "tags_micro_recall": 0.5927934908950019,
+        "tags_micro_f1": 0.27669771227054885,
+        "tags_subset_accuracy": 0.0008561643835616438,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7452830188679245,
+          "B": 0.1320754716981132,
+          "C": 0.24528301886792453,
+          "D": 0.3867924528301887,
+          "E": 0.46798029556650245,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1983586013034624,
+        "difficulty_accuracy": 0.2843601895734597,
+        "difficulty_macro_f1": 0.18182039274086625,
+        "tags_micro_precision": 0.18032786885245902,
+        "tags_micro_recall": 0.5360169491525424,
+        "tags_micro_f1": 0.2698666666666667,
+        "tags_subset_accuracy": 0.009478672985781991,
+        "difficulty_per_class_accuracy": {
+          "A": 0.631578947368421,
+          "B": 0.3157894736842105,
+          "C": 0.13157894736842105,
+          "D": 0.23684210526315788,
+          "E": 0.2777777777777778,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 8,
+      "train": {
+        "loss": 2.0247646227274854,
+        "difficulty_accuracy": 0.3647260273972603,
+        "difficulty_macro_f1": 0.22817873466259744,
+        "tags_micro_precision": 0.19403184798608322,
+        "tags_micro_recall": 0.5617977528089888,
+        "tags_micro_f1": 0.2884424109807042,
+        "tags_subset_accuracy": 0.0017123287671232876,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7358490566037735,
+          "B": 0.24056603773584906,
+          "C": 0.2358490566037736,
+          "D": 0.2830188679245283,
+          "E": 0.5369458128078818,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.18760808384249,
+        "difficulty_accuracy": 0.2890995260663507,
+        "difficulty_macro_f1": 0.19221492020721725,
+        "tags_micro_precision": 0.18587360594795538,
+        "tags_micro_recall": 0.5296610169491526,
+        "tags_micro_f1": 0.275178866263071,
+        "tags_subset_accuracy": 0.009478672985781991,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5789473684210527,
+          "B": 0.23684210526315788,
+          "C": 0.2631578947368421,
+          "D": 0.23684210526315788,
+          "E": 0.3055555555555556,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 9,
+      "train": {
+        "loss": 1.9937106681196657,
+        "difficulty_accuracy": 0.3707191780821918,
+        "difficulty_macro_f1": 0.23844624369636924,
+        "tags_micro_precision": 0.19347664936990364,
+        "tags_micro_recall": 0.6067415730337079,
+        "tags_micro_f1": 0.29339578454332554,
+        "tags_subset_accuracy": 0.003424657534246575,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6933962264150944,
+          "B": 0.3113207547169811,
+          "C": 0.2169811320754717,
+          "D": 0.28773584905660377,
+          "E": 0.5517241379310345,
+          "F": 0.013513513513513514,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.190778172976598,
+        "difficulty_accuracy": 0.26540284360189575,
+        "difficulty_macro_f1": 0.1714890229596112,
+        "tags_micro_precision": 0.18421052631578946,
+        "tags_micro_recall": 0.5338983050847458,
+        "tags_micro_f1": 0.27391304347826084,
+        "tags_subset_accuracy": 0.009478672985781991,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6052631578947368,
+          "B": 0.21052631578947367,
+          "C": 0.2631578947368421,
+          "D": 0.13157894736842105,
+          "E": 0.2777777777777778,
+          "F": 0.0,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 10,
+      "train": {
+        "loss": 1.966339304022593,
+        "difficulty_accuracy": 0.3852739726027397,
+        "difficulty_macro_f1": 0.2568887017755943,
+        "tags_micro_precision": 0.20308909880010212,
+        "tags_micro_recall": 0.616427741185587,
+        "tags_micro_f1": 0.3055208833413346,
+        "tags_subset_accuracy": 0.0008561643835616438,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6650943396226415,
+          "B": 0.32075471698113206,
+          "C": 0.35377358490566035,
+          "D": 0.2783018867924528,
+          "E": 0.5123152709359606,
+          "F": 0.04054054054054054,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1861042298411872,
+        "difficulty_accuracy": 0.3033175355450237,
+        "difficulty_macro_f1": 0.19668600701681635,
+        "tags_micro_precision": 0.1797202797202797,
+        "tags_micro_recall": 0.5444915254237288,
+        "tags_micro_f1": 0.27024185068349105,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6842105263157895,
+          "B": 0.21052631578947367,
+          "C": 0.07894736842105263,
+          "D": 0.4473684210526316,
+          "E": 0.25,
+          "F": 0.07142857142857142,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 11,
+      "train": {
+        "loss": 1.932017156522568,
+        "difficulty_accuracy": 0.4066780821917808,
+        "difficulty_macro_f1": 0.27295116299207856,
+        "tags_micro_precision": 0.1951309028627355,
+        "tags_micro_recall": 0.6179775280898876,
+        "tags_micro_f1": 0.29660622966062294,
+        "tags_subset_accuracy": 0.0017123287671232876,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7783018867924528,
+          "B": 0.25,
+          "C": 0.2641509433962264,
+          "D": 0.4386792452830189,
+          "E": 0.5024630541871922,
+          "F": 0.08108108108108109,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1825578992400687,
+        "difficulty_accuracy": 0.2938388625592417,
+        "difficulty_macro_f1": 0.20539760392923045,
+        "tags_micro_precision": 0.1810406272273699,
+        "tags_micro_recall": 0.538135593220339,
+        "tags_micro_f1": 0.2709333333333333,
+        "tags_subset_accuracy": 0.004739336492890996,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6052631578947368,
+          "B": 0.2631578947368421,
+          "C": 0.15789473684210525,
+          "D": 0.2894736842105263,
+          "E": 0.3055555555555556,
+          "F": 0.07142857142857142,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 12,
+      "train": {
+        "loss": 1.9083858597768497,
+        "difficulty_accuracy": 0.4160958904109589,
+        "difficulty_macro_f1": 0.2873375493344141,
+        "tags_micro_precision": 0.20772510011626405,
+        "tags_micro_recall": 0.6230143355288648,
+        "tags_micro_f1": 0.3115675256733192,
+        "tags_subset_accuracy": 0.0025684931506849314,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7264150943396226,
+          "B": 0.4009433962264151,
+          "C": 0.30660377358490565,
+          "D": 0.330188679245283,
+          "E": 0.5123152709359606,
+          "F": 0.10810810810810811,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1832670656990665,
+        "difficulty_accuracy": 0.2938388625592417,
+        "difficulty_macro_f1": 0.20110032427821387,
+        "tags_micro_precision": 0.17825793382849425,
+        "tags_micro_recall": 0.559322033898305,
+        "tags_micro_f1": 0.2703533026113671,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5526315789473685,
+          "B": 0.2631578947368421,
+          "C": 0.10526315789473684,
+          "D": 0.47368421052631576,
+          "E": 0.2222222222222222,
+          "F": 0.07142857142857142,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 13,
+      "train": {
+        "loss": 1.8770910207539389,
+        "difficulty_accuracy": 0.4238013698630137,
+        "difficulty_macro_f1": 0.29897606573964614,
+        "tags_micro_precision": 0.2084657429769925,
+        "tags_micro_recall": 0.63541263076327,
+        "tags_micro_f1": 0.31393568147013784,
+        "tags_subset_accuracy": 0.003424657534246575,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7028301886792453,
+          "B": 0.42924528301886794,
+          "C": 0.2641509433962264,
+          "D": 0.38207547169811323,
+          "E": 0.5270935960591133,
+          "F": 0.14864864864864866,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.176559391744894,
+        "difficulty_accuracy": 0.3033175355450237,
+        "difficulty_macro_f1": 0.21785651817379506,
+        "tags_micro_precision": 0.17511832319134552,
+        "tags_micro_recall": 0.548728813559322,
+        "tags_micro_f1": 0.265504869297796,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.631578947368421,
+          "B": 0.13157894736842105,
+          "C": 0.23684210526315788,
+          "D": 0.34210526315789475,
+          "E": 0.3055555555555556,
+          "F": 0.14285714285714285,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 14,
+      "train": {
+        "loss": 1.8588743830380374,
+        "difficulty_accuracy": 0.4289383561643836,
+        "difficulty_macro_f1": 0.31056626722498804,
+        "tags_micro_precision": 0.20764347068343084,
+        "tags_micro_recall": 0.6462611390933747,
+        "tags_micro_f1": 0.31430186546071226,
+        "tags_subset_accuracy": 0.0017123287671232876,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7122641509433962,
+          "B": 0.41037735849056606,
+          "C": 0.28773584905660377,
+          "D": 0.32075471698113206,
+          "E": 0.5763546798029556,
+          "F": 0.22972972972972974,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1832666329297976,
+        "difficulty_accuracy": 0.3080568720379147,
+        "difficulty_macro_f1": 0.22011845144297926,
+        "tags_micro_precision": 0.18513011152416356,
+        "tags_micro_recall": 0.527542372881356,
+        "tags_micro_f1": 0.2740781507980187,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.631578947368421,
+          "B": 0.18421052631578946,
+          "C": 0.2631578947368421,
+          "D": 0.34210526315789475,
+          "E": 0.25,
+          "F": 0.14285714285714285,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 15,
+      "train": {
+        "loss": 1.8308175622600398,
+        "difficulty_accuracy": 0.4383561643835616,
+        "difficulty_macro_f1": 0.3188520516793958,
+        "tags_micro_precision": 0.21311475409836064,
+        "tags_micro_recall": 0.6396745447500969,
+        "tags_micro_f1": 0.31971340046475594,
+        "tags_subset_accuracy": 0.003424657534246575,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7122641509433962,
+          "B": 0.35377358490566035,
+          "C": 0.41037735849056606,
+          "D": 0.3867924528301887,
+          "E": 0.4975369458128079,
+          "F": 0.21621621621621623,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1958995961464978,
+        "difficulty_accuracy": 0.2890995260663507,
+        "difficulty_macro_f1": 0.2063522690400037,
+        "tags_micro_precision": 0.19162995594713655,
+        "tags_micro_recall": 0.5529661016949152,
+        "tags_micro_f1": 0.28462377317339144,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.631578947368421,
+          "B": 0.2894736842105263,
+          "C": 0.10526315789473684,
+          "D": 0.2631578947368421,
+          "E": 0.2777777777777778,
+          "F": 0.14285714285714285,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 16,
+      "train": {
+        "loss": 1.8091203219270053,
+        "difficulty_accuracy": 0.449486301369863,
+        "difficulty_macro_f1": 0.3247217726353776,
+        "tags_micro_precision": 0.21660936260248612,
+        "tags_micro_recall": 0.6346377373111197,
+        "tags_micro_f1": 0.32298136645962733,
+        "tags_subset_accuracy": 0.0017123287671232876,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7216981132075472,
+          "B": 0.4481132075471698,
+          "C": 0.27358490566037735,
+          "D": 0.3867924528301887,
+          "E": 0.5911330049261084,
+          "F": 0.22972972972972974,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1747013754189295,
+        "difficulty_accuracy": 0.3175355450236967,
+        "difficulty_macro_f1": 0.23394066403505012,
+        "tags_micro_precision": 0.18138586956521738,
+        "tags_micro_recall": 0.565677966101695,
+        "tags_micro_f1": 0.27469135802469136,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.6052631578947368,
+          "B": 0.15789473684210525,
+          "C": 0.34210526315789475,
+          "D": 0.3157894736842105,
+          "E": 0.2777777777777778,
+          "F": 0.21428571428571427,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 17,
+      "train": {
+        "loss": 1.790320189031836,
+        "difficulty_accuracy": 0.4520547945205479,
+        "difficulty_macro_f1": 0.33410476665252675,
+        "tags_micro_precision": 0.21424216558956224,
+        "tags_micro_recall": 0.6807438977140643,
+        "tags_micro_f1": 0.3259135596364311,
+        "tags_subset_accuracy": 0.0025684931506849314,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7169811320754716,
+          "B": 0.4339622641509434,
+          "C": 0.3584905660377358,
+          "D": 0.3490566037735849,
+          "E": 0.541871921182266,
+          "F": 0.32432432432432434,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1863501388314774,
+        "difficulty_accuracy": 0.2796208530805687,
+        "difficulty_macro_f1": 0.19073434354039948,
+        "tags_micro_precision": 0.18907260963335729,
+        "tags_micro_recall": 0.5572033898305084,
+        "tags_micro_f1": 0.28234031132581855,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5526315789473685,
+          "B": 0.2894736842105263,
+          "C": 0.07894736842105263,
+          "D": 0.34210526315789475,
+          "E": 0.2777777777777778,
+          "F": 0.07142857142857142,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    },
+    {
+      "epoch": 18,
+      "train": {
+        "loss": 1.7606208700023285,
+        "difficulty_accuracy": 0.4666095890410959,
+        "difficulty_macro_f1": 0.34731284321003186,
+        "tags_micro_precision": 0.22276187975846679,
+        "tags_micro_recall": 0.6574970941495545,
+        "tags_micro_f1": 0.3327777233062065,
+        "tags_subset_accuracy": 0.0025684931506849314,
+        "difficulty_per_class_accuracy": {
+          "A": 0.7358490566037735,
+          "B": 0.4386792452830189,
+          "C": 0.33490566037735847,
+          "D": 0.4481132075471698,
+          "E": 0.541871921182266,
+          "F": 0.25675675675675674,
+          "G": 0.04,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 212,
+          "B": 212,
+          "C": 212,
+          "D": 212,
+          "E": 203,
+          "F": 74,
+          "G": 25,
+          "H": 18
+        }
+      },
+      "validation": {
+        "loss": 2.1862454097982833,
+        "difficulty_accuracy": 0.3080568720379147,
+        "difficulty_macro_f1": 0.2243526797320219,
+        "tags_micro_precision": 0.18557422969187676,
+        "tags_micro_recall": 0.5614406779661016,
+        "tags_micro_f1": 0.2789473684210526,
+        "tags_subset_accuracy": 0.0,
+        "difficulty_per_class_accuracy": {
+          "A": 0.5789473684210527,
+          "B": 0.18421052631578946,
+          "C": 0.3684210526315789,
+          "D": 0.2631578947368421,
+          "E": 0.2777777777777778,
+          "F": 0.14285714285714285,
+          "G": 0.0,
+          "H": 0.0
+        },
+        "difficulty_per_class_support": {
+          "A": 38,
+          "B": 38,
+          "C": 38,
+          "D": 38,
+          "E": 36,
+          "F": 14,
+          "G": 5,
+          "H": 4
+        }
+      }
+    }
+  ],
+  "test_metrics": {
+    "loss": 2.0657846260070802,
+    "difficulty_accuracy": 0.33,
+    "difficulty_macro_f1": 0.22988720486261743,
+    "tags_micro_precision": 0.20788704965920154,
+    "tags_micro_recall": 0.6325925925925926,
+    "tags_micro_f1": 0.3129351410773177,
+    "tags_subset_accuracy": 0.0033333333333333335,
+    "difficulty_per_class_accuracy": {
+      "A": 0.5633802816901409,
+      "B": 0.171875,
+      "C": 0.1836734693877551,
+      "D": 0.2916666666666667,
+      "E": 0.5238095238095238,
+      "F": 0.1875,
+      "G": 0.0,
+      "H": 0.0
+    },
+    "difficulty_per_class_support": {
+      "A": 71,
+      "B": 64,
+      "C": 49,
+      "D": 48,
+      "E": 42,
+      "F": 16,
+      "G": 6,
+      "H": 4
+    }
+  }
+}

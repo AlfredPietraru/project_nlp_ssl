@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import torch
 from torch import nn
 from torch.utils.data import Dataset
@@ -458,7 +459,7 @@ class FrozenEmbeddingPipeline:
         tag_pos_weights = self._build_tag_pos_weights(label_statistics)
 
         best_validation_loss = float("inf")
-        best_model_path = self.output_dir / "best_model.pt"
+        best_state_dict: dict[str, torch.Tensor] | None = None
         history: list[dict[str, Any]] = []
         best_epoch = 0
         early_stopping_counter = 0
@@ -500,7 +501,10 @@ class FrozenEmbeddingPipeline:
                 best_validation_loss = validation_metrics["loss"]
                 best_epoch = epoch
                 early_stopping_counter = 0
-                torch.save(model.state_dict(), best_model_path)
+                best_state_dict = {
+                    key: value.detach().cpu().clone()
+                    for key, value in model.state_dict().items()
+                }
             else:
                 early_stopping_counter += 1
 
@@ -512,7 +516,10 @@ class FrozenEmbeddingPipeline:
                 )
                 break
 
-        model.load_state_dict(torch.load(best_model_path, map_location=self.device))
+        if best_state_dict is None:
+            raise RuntimeError("Training finished without capturing a best model state")
+
+        model.load_state_dict(best_state_dict)
         test_metrics = self._run_epoch(
             model=model,
             data_loader=test_loader,
@@ -528,6 +535,10 @@ class FrozenEmbeddingPipeline:
             "merge_gh_into_f": self.config.merge_gh_into_f,
             "unfreeze_top_n_transformer_layers": self.config.unfreeze_top_n_transformer_layers,
             "input_dim": input_dim,
+            "embedding_model_name": self.embedding_model.model_name,
+            "requested_max_length": self.embedding_model.requested_max_length,
+            "effective_max_length": self.embedding_model.max_length,
+            "max_supported_length": self.embedding_model.max_supported_length,
             "label_encoder": label_encoder.to_dict(),
             "label_statistics": label_statistics.to_dict(),
             "difficulty_class_weights": difficulty_class_weights.detach().cpu().tolist(),
@@ -538,7 +549,8 @@ class FrozenEmbeddingPipeline:
             "history": history,
             "test_metrics": test_metrics,
         }
-        self._save_artifacts(model=model, metadata=metadata)
+        self._save_artifacts(metadata=metadata)
+        self._save_experiment_outputs(metadata)
         return metadata
 
     def predict_split(self, split_name: str = "test", model_dir: str | Path | None = None) -> dict[str, Any]:
@@ -581,35 +593,9 @@ class FrozenEmbeddingPipeline:
         self,
         model_dir: str | Path | None = None,
     ) -> tuple[FrozenEmbeddingClassifier, dict[str, Any], ProblemLabelEncoder]:
-        model_path = Path(model_dir or self.output_dir)
-        metadata_path = model_path / "metadata.json"
-        weights_path = model_path / "best_model.pt"
-
-        with metadata_path.open(encoding="utf-8") as input_file:
-            metadata = json.load(input_file)
-
-        label_encoder = ProblemLabelEncoder.from_dict(metadata["label_encoder"])
-        if metadata.get("unfreeze_top_n_transformer_layers", 0) > 0:
-            self.embedding_model.freeze_all_parameters()
-            self.embedding_model.unfreeze_top_transformer_layers(metadata["unfreeze_top_n_transformer_layers"])
-            model = TransformerFineTuningClassifier(
-                embedding_model=self.embedding_model,
-                num_difficulties=len(label_encoder.difficulties),
-                num_tags=len(label_encoder.tags),
-                hidden_dim=metadata["config"]["hidden_dim"],
-                dropout=metadata["config"]["dropout"],
-            ).to(self.device)
-        else:
-            model = FrozenEmbeddingClassifier(
-                input_dim=metadata["input_dim"],
-                num_difficulties=len(label_encoder.difficulties),
-                num_tags=len(label_encoder.tags),
-                hidden_dim=metadata["config"]["hidden_dim"],
-                dropout=metadata["config"]["dropout"],
-            ).to(self.device)
-        model.load_state_dict(torch.load(weights_path, map_location=self.device))
-        model.eval()
-        return model, metadata, label_encoder
+        raise RuntimeError(
+            "Model checkpoint loading is disabled because experiments no longer save model weights to disk."
+        )
 
     def _build_prediction_loader(
         self,
@@ -882,13 +868,187 @@ class FrozenEmbeddingPipeline:
             return model(batch["text"])
         return model(batch["embedding"].to(self.device))
 
-    def _save_artifacts(self, model: FrozenEmbeddingClassifier, metadata: dict[str, Any]) -> None:
+    def _save_artifacts(self, metadata: dict[str, Any]) -> None:
         metadata_path = self.output_dir / "metadata.json"
-        weights_path = self.output_dir / "best_model.pt"
 
-        torch.save(model.state_dict(), weights_path)
         with metadata_path.open("w", encoding="utf-8") as output_file:
             json.dump(metadata, output_file, indent=2)
+
+    def _save_experiment_outputs(self, metadata: dict[str, Any]) -> None:
+        self._save_training_plots(metadata)
+        self._save_experiment_report(metadata)
+
+    def _save_training_plots(self, metadata: dict[str, Any]) -> None:
+        history = metadata.get("history", [])
+        if not history:
+            return
+
+        epochs = [item["epoch"] for item in history]
+        train_loss = [item["train"]["loss"] for item in history]
+        val_loss = [item["validation"]["loss"] for item in history]
+        train_diff_acc = [item["train"]["difficulty_accuracy"] for item in history]
+        val_diff_acc = [item["validation"]["difficulty_accuracy"] for item in history]
+        train_tag_f1 = [item["train"]["tags_micro_f1"] for item in history]
+        val_tag_f1 = [item["validation"]["tags_micro_f1"] for item in history]
+
+        self._plot_metric(
+            epochs=epochs,
+            train_values=train_loss,
+            validation_values=val_loss,
+            ylabel="Loss",
+            title="Training vs Validation Loss",
+            output_path=self.output_dir / "training_validation_loss.png",
+        )
+        self._plot_metric(
+            epochs=epochs,
+            train_values=train_diff_acc,
+            validation_values=val_diff_acc,
+            ylabel="Difficulty Accuracy",
+            title="Training vs Validation Difficulty Accuracy",
+            output_path=self.output_dir / "training_validation_difficulty_accuracy.png",
+        )
+        self._plot_metric(
+            epochs=epochs,
+            train_values=train_tag_f1,
+            validation_values=val_tag_f1,
+            ylabel="Tag Micro F1",
+            title="Training vs Validation Tag Micro F1",
+            output_path=self.output_dir / "training_validation_tags_micro_f1.png",
+        )
+
+    def _save_experiment_report(self, metadata: dict[str, Any]) -> None:
+        report_path = self.output_dir / "experiment_report.md"
+        test_metrics = metadata["test_metrics"]
+        label_stats = metadata["label_statistics"]
+        config = metadata["config"]
+
+        dataset_logic_lines = [
+            f"- Dataset root: `{config['dataset_root']}`",
+            f"- Running mode: `{metadata['running_mode']}`",
+            f"- Merge `G/H -> F`: `{metadata['merge_gh_into_f']}`",
+            f"- Train cap per difficulty: `{config['max_train_examples_per_difficulty']}`",
+            "- Train/validation split: stratified by difficulty from the train split",
+            f"- Validation ratio per difficulty bucket: `{config['validation_ratio']}`",
+            "- Test split: original dataset test split, untouched",
+            f"- Random solution sampling in train: `True`",
+            f"- Deterministic first solution in validation/test: `True`",
+        ]
+
+        model_lines = [
+            f"- Embedding model: `{metadata['embedding_model_name']}`",
+            f"- Requested max length: `{metadata['requested_max_length']}`",
+            f"- Effective max length used: `{metadata['effective_max_length']}`",
+            f"- Model-supported max length: `{metadata['max_supported_length']}`",
+            f"- Unfrozen top transformer layers: `{metadata['unfreeze_top_n_transformer_layers']}`",
+            f"- Encoder learning rate: `{config['encoder_learning_rate']}`",
+            f"- Head hidden dim: `{config['hidden_dim']}`",
+            f"- Dropout: `{config['dropout']}`",
+        ]
+
+        training_lines = [
+            f"- Batch size: `{config['batch_size']}`",
+            f"- Head learning rate: `{config['learning_rate']}`",
+            f"- Weight decay: `{config['weight_decay']}`",
+            f"- Difficulty loss type: `{config['difficulty_loss_type']}`",
+            f"- Tags loss type: `{config['tags_loss_type']}`",
+            f"- Difficulty loss weight: `{config['difficulty_loss_weight']}`",
+            f"- Tags loss weight: `{config['tags_loss_weight']}`",
+            f"- Early stopping patience: `{config['early_stopping_patience']}`",
+            f"- Early stopping min delta: `{config['early_stopping_min_delta']}`",
+            f"- Max epochs: `{config['num_epochs']}`",
+            f"- Best epoch: `{metadata['best_epoch']}`",
+            f"- Stopped epoch: `{metadata['stopped_epoch']}`",
+            f"- Best validation loss: `{metadata['best_validation_loss']:.4f}`",
+        ]
+
+        difficulty_table = self._build_markdown_table(
+            headers=["Metric", "Value"],
+            rows=[
+                ["Accuracy", f"{test_metrics['difficulty_accuracy']:.4f}"],
+                ["Macro F1", f"{test_metrics['difficulty_macro_f1']:.4f}"],
+            ],
+        )
+        tags_table = self._build_markdown_table(
+            headers=["Metric", "Value"],
+            rows=[
+                ["Subset Accuracy", f"{test_metrics['tags_subset_accuracy']:.4f}"],
+                ["Micro Precision", f"{test_metrics['tags_micro_precision']:.4f}"],
+                ["Micro Recall", f"{test_metrics['tags_micro_recall']:.4f}"],
+                ["Micro F1", f"{test_metrics['tags_micro_f1']:.4f}"],
+            ],
+        )
+
+        per_class_rows = []
+        for label, accuracy in test_metrics["difficulty_per_class_accuracy"].items():
+            support = test_metrics["difficulty_per_class_support"].get(label, 0)
+            per_class_rows.append([label, str(support), f"{accuracy:.4f}"])
+        per_class_table = self._build_markdown_table(
+            headers=["Difficulty", "Support", "Accuracy"],
+            rows=per_class_rows,
+        )
+
+        report = "\n".join([
+            "# Experiment Report",
+            "",
+            "## Dataset Construction",
+            *dataset_logic_lines,
+            "",
+            "## Model",
+            *model_lines,
+            "",
+            "## Training Hyperparameters",
+            *training_lines,
+            "",
+            "## Difficulty Metrics",
+            difficulty_table,
+            "",
+            "## Tag Metrics",
+            tags_table,
+            "",
+            "## Difficulty Per-Class Accuracy",
+            per_class_table,
+            "",
+            "## Label Statistics",
+            f"- Number of training examples after validation split: `{label_stats['num_examples']}`",
+            f"- Difficulty counts: `{label_stats['difficulty_counts']}`",
+            f"- Number of tags: `{len(metadata['label_encoder']['tags'])}`",
+            "",
+            "## Generated Files",
+            "- `metadata.json`",
+            "- `training_validation_loss.png`",
+            "- `training_validation_difficulty_accuracy.png`",
+            "- `training_validation_tags_micro_f1.png`",
+        ])
+
+        with report_path.open("w", encoding="utf-8") as output_file:
+            output_file.write(report + "\n")
+
+    @staticmethod
+    def _plot_metric(
+        epochs: list[int],
+        train_values: list[float],
+        validation_values: list[float],
+        ylabel: str,
+        title: str,
+        output_path: Path,
+    ) -> None:
+        plt.figure(figsize=(10, 6))
+        plt.plot(epochs, train_values, marker="o", label="Train")
+        plt.plot(epochs, validation_values, marker="o", label="Validation")
+        plt.xlabel("Epoch")
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=180)
+        plt.close()
+
+    @staticmethod
+    def _build_markdown_table(headers: list[str], rows: list[list[str]]) -> str:
+        header_line = "| " + " | ".join(headers) + " |"
+        separator_line = "| " + " | ".join(["---"] * len(headers)) + " |"
+        row_lines = ["| " + " | ".join(row) + " |" for row in rows]
+        return "\n".join([header_line, separator_line, *row_lines])
 
     @staticmethod
     def _set_seed(seed: int) -> None:

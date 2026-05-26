@@ -26,10 +26,14 @@ class TextEmbeddingModel:
         device: str | None = None,
     ) -> None:
         self.model_name = model_name
-        self.max_length = max_length
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name)
+        tokenizer_limit = int(self.tokenizer.model_max_length)
+        model_limit = int(getattr(self.model.config, "max_position_embeddings", tokenizer_limit))
+        self.requested_max_length = int(max_length)
+        self.max_supported_length = min(tokenizer_limit, model_limit)
+        self.max_length = min(self.requested_max_length, self.max_supported_length)
         self.model.to(self.device)
         self.model.eval()
 
