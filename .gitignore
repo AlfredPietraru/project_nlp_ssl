@@ -6,3 +6,8 @@ predictions.json
 model_output
 prediction_report
 training_data
+__pycache__
+.env
+augmented_data
+plots
+augmented_plots
