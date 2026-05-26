@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tags-loss-type", default="weighted_bce", choices=["bce", "weighted_bce"])
     parser.add_argument("--max-difficulty-class-weight", type=float, default=10.0)
     parser.add_argument("--max-tag-pos-weight", type=float, default=20.0)
+    parser.add_argument("--max-train-examples-per-difficulty", type=int, default=None)
+    parser.add_argument("--early-stopping-patience", type=int, default=5)
+    parser.add_argument("--early-stopping-min-delta", type=float, default=0.01)
+    parser.add_argument("--merge-gh-into-f", action="store_true")
+    parser.add_argument("--unfreeze-top-n-transformer-layers", type=int, default=0)
+    parser.add_argument("--encoder-learning-rate", type=float, default=1e-5)
     return parser
 
 
@@ -61,6 +67,12 @@ def main() -> None:
         tags_loss_type=args.tags_loss_type,
         max_difficulty_class_weight=args.max_difficulty_class_weight,
         max_tag_pos_weight=args.max_tag_pos_weight,
+        max_train_examples_per_difficulty=args.max_train_examples_per_difficulty,
+        early_stopping_patience=args.early_stopping_patience,
+        early_stopping_min_delta=args.early_stopping_min_delta,
+        merge_gh_into_f=args.merge_gh_into_f,
+        unfreeze_top_n_transformer_layers=args.unfreeze_top_n_transformer_layers,
+        encoder_learning_rate=args.encoder_learning_rate,
     )
 
     pipeline = FrozenEmbeddingPipeline(config)

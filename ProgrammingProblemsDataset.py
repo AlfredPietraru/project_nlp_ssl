@@ -33,20 +33,27 @@ class TextEmbeddingModel:
         self.model.to(self.device)
         self.model.eval()
 
-    def encode(self, text: str) -> torch.Tensor:
+    @property
+    def hidden_size(self) -> int:
+        return int(self.model.config.hidden_size)
+
+    def tokenize_batch(self, texts: list[str]) -> dict[str, torch.Tensor]:
         inputs = self.tokenizer(
-            text,
+            texts,
             padding=True,
             truncation=True,
             max_length=self.max_length,
             return_tensors="pt",
         )
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+        return {key: value.to(self.device) for key, value in inputs.items()}
+
+    def encode(self, text: str) -> torch.Tensor:
+        inputs = self.tokenize_batch([text])
 
         with torch.no_grad():
             outputs = self.model(**inputs)
 
-        embedding = self._mean_pool(
+        embedding = self.mean_pool(
             token_embeddings=outputs.last_hidden_state,
             attention_mask=inputs["attention_mask"],
         )
@@ -54,11 +61,27 @@ class TextEmbeddingModel:
         return embedding.squeeze(0).cpu()
 
     @staticmethod
-    def _mean_pool(token_embeddings: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def mean_pool(token_embeddings: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         expanded_mask = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         summed_embeddings = torch.sum(token_embeddings * expanded_mask, dim=1)
         summed_mask = torch.clamp(expanded_mask.sum(dim=1), min=1e-9)
         return summed_embeddings / summed_mask
+
+    def freeze_all_parameters(self) -> None:
+        for parameter in self.model.parameters():
+            parameter.requires_grad = False
+
+    def unfreeze_top_transformer_layers(self, num_layers: int) -> None:
+        if num_layers <= 0:
+            return
+
+        encoder_layers = getattr(getattr(self.model, "encoder", None), "layer", None)
+        if encoder_layers is None:
+            raise ValueError("Underlying model does not expose encoder layers for partial unfreezing")
+
+        for layer in encoder_layers[-num_layers:]:
+            for parameter in layer.parameters():
+                parameter.requires_grad = True
 
 
 class ProgrammingProblemsDataset(Dataset):

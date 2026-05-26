@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import copy
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -48,6 +49,12 @@ class TrainingConfig:
     tags_loss_type: str = "weighted_bce"
     max_difficulty_class_weight: float = 10.0
     max_tag_pos_weight: float = 20.0
+    max_train_examples_per_difficulty: int | None = None
+    early_stopping_patience: int = 5
+    early_stopping_min_delta: float = 0.01
+    merge_gh_into_f: bool = False
+    unfreeze_top_n_transformer_layers: int = 0
+    encoder_learning_rate: float = 1e-5
 
 
 class ProblemLabelEncoder:
@@ -145,6 +152,33 @@ class EncodedProblemsDataset(Dataset):
         }
 
 
+class TextProblemsDataset(Dataset):
+    def __init__(
+        self,
+        base_dataset: ProgrammingProblemsDataset,
+        label_encoder: ProblemLabelEncoder,
+    ) -> None:
+        self.base_dataset = base_dataset
+        self.label_encoder = label_encoder
+
+    def __len__(self) -> int:
+        return len(self.base_dataset)
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        item = self.base_dataset[index]
+        return {
+            "id": item["id"],
+            "text": item["text"],
+            "difficulty_label": torch.tensor(
+                self.label_encoder.encode_difficulty(item["difficulty"]),
+                dtype=torch.long,
+            ),
+            "tag_labels": self.label_encoder.encode_tags(item["tags"]),
+            "difficulty": item["difficulty"],
+            "tags": item["tags"],
+        }
+
+
 class EncodedProblemsDataLoader(ProgrammingProblemsDataLoader):
     @staticmethod
     def _collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
@@ -154,6 +188,19 @@ class EncodedProblemsDataLoader(ProgrammingProblemsDataLoader):
             "difficulty": [item["difficulty"] for item in batch],
             "tags": [item["tags"] for item in batch],
             "embedding": torch.stack([item["embedding"] for item in batch]),
+            "difficulty_label": torch.stack([item["difficulty_label"] for item in batch]),
+            "tag_labels": torch.stack([item["tag_labels"] for item in batch]),
+        }
+
+
+class TextProblemsDataLoader(ProgrammingProblemsDataLoader):
+    @staticmethod
+    def _collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "id": [item["id"] for item in batch],
+            "text": [item["text"] for item in batch],
+            "difficulty": [item["difficulty"] for item in batch],
+            "tags": [item["tags"] for item in batch],
             "difficulty_label": torch.stack([item["difficulty_label"] for item in batch]),
             "tag_labels": torch.stack([item["tag_labels"] for item in batch]),
         }
@@ -185,6 +232,40 @@ class FrozenEmbeddingClassifier(nn.Module):
         }
 
 
+class TransformerFineTuningClassifier(nn.Module):
+    def __init__(
+        self,
+        embedding_model: TextEmbeddingModel,
+        num_difficulties: int,
+        num_tags: int,
+        hidden_dim: int = 256,
+        dropout: float = 0.2,
+    ) -> None:
+        super().__init__()
+        self.embedding_model = embedding_model
+        self.shared = nn.Sequential(
+            nn.Linear(embedding_model.hidden_size, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+        self.difficulty_head = nn.Linear(hidden_dim, num_difficulties)
+        self.tags_head = nn.Linear(hidden_dim, num_tags)
+
+    def forward(self, texts: list[str]) -> dict[str, torch.Tensor]:
+        inputs = self.embedding_model.tokenize_batch(texts)
+        outputs = self.embedding_model.model(**inputs)
+        embedding = self.embedding_model.mean_pool(
+            token_embeddings=outputs.last_hidden_state,
+            attention_mask=inputs["attention_mask"],
+        )
+        embedding = nn.functional.normalize(embedding, p=2, dim=1)
+        features = self.shared(embedding)
+        return {
+            "difficulty_logits": self.difficulty_head(features),
+            "tags_logits": self.tags_head(features),
+        }
+
+
 class ProblemDatasetFactory:
     def __init__(
         self,
@@ -199,24 +280,43 @@ class ProblemDatasetFactory:
         self.running_mode = running_mode
         self.validation_ratio = validation_ratio
         self.random_seed = random_seed
+        self.max_train_examples_per_difficulty: int | None = None
+        self.merge_gh_into_f = False
+
+    def set_max_train_examples_per_difficulty(self, value: int | None) -> None:
+        self.max_train_examples_per_difficulty = value
+
+    def set_merge_gh_into_f(self, value: bool) -> None:
+        self.merge_gh_into_f = value
 
     def build(self) -> tuple[
-        EncodedProblemsDataset,
-        EncodedProblemsDataset,
-        EncodedProblemsDataset,
+        ProgrammingProblemsDataset,
+        ProgrammingProblemsDataset,
+        ProgrammingProblemsDataset,
         ProblemLabelEncoder,
         LabelStatistics,
     ]:
-        train_entries = self.dataset_reader.retrieve_split_data("train")
-        test_entries = self.dataset_reader.retrieve_split_data("test")
+        train_entries = self._normalize_entries(
+            self.dataset_reader.retrieve_split_data("train"),
+        )
+        test_entries = self._normalize_entries(
+            self.dataset_reader.retrieve_split_data("test"),
+        )
+
+        if self.max_train_examples_per_difficulty is not None:
+            train_entries = self._cap_train_entries(
+                train_entries,
+                max_examples_per_difficulty=self.max_train_examples_per_difficulty,
+            )
+
         split_train_entries, split_validation_entries = self._split_train_validation(train_entries)
 
         label_encoder = ProblemLabelEncoder.fit(split_train_entries)
         label_statistics = self._compute_label_statistics(split_train_entries, label_encoder)
 
-        train_dataset = self._build_dataset(split_train_entries, sample_random_solution=True, label_encoder=label_encoder)
-        validation_dataset = self._build_dataset(split_validation_entries, sample_random_solution=False, label_encoder=label_encoder)
-        test_dataset = self._build_dataset(test_entries, sample_random_solution=False, label_encoder=label_encoder)
+        train_dataset = self._build_dataset(split_train_entries, sample_random_solution=True)
+        validation_dataset = self._build_dataset(split_validation_entries, sample_random_solution=False)
+        test_dataset = self._build_dataset(test_entries, sample_random_solution=False)
 
         return train_dataset, validation_dataset, test_dataset, label_encoder, label_statistics
 
@@ -224,18 +324,16 @@ class ProblemDatasetFactory:
         self,
         entries: list[DatasetEntry],
         sample_random_solution: bool,
-        label_encoder: ProblemLabelEncoder,
-    ) -> EncodedProblemsDataset:
-        base_dataset = ProgrammingProblemsDataset(
+    ) -> ProgrammingProblemsDataset:
+        return ProgrammingProblemsDataset(
             dataset_reader=self.dataset_reader,
             is_train=sample_random_solution,
             running_mode=self.running_mode,
             embedding_model=self.embedding_model,
-            include_embeddings=True,
+            include_embeddings=False,
             entries=entries,
             sample_random_solution=sample_random_solution,
         )
-        return EncodedProblemsDataset(base_dataset=base_dataset, label_encoder=label_encoder)
 
     def _split_train_validation(self, entries: list[DatasetEntry]) -> tuple[list[DatasetEntry], list[DatasetEntry]]:
         grouped_entries: dict[str, list[DatasetEntry]] = defaultdict(list)
@@ -284,6 +382,39 @@ class ProblemDatasetFactory:
             num_examples=len(entries),
         )
 
+    def _cap_train_entries(
+        self,
+        entries: list[DatasetEntry],
+        max_examples_per_difficulty: int,
+    ) -> list[DatasetEntry]:
+        grouped_entries: dict[str, list[DatasetEntry]] = defaultdict(list)
+        for entry in entries:
+            grouped_entries[entry.difficulty.strip().upper()].append(entry)
+
+        random_generator = random.Random(self.random_seed)
+        capped_entries: list[DatasetEntry] = []
+
+        for difficulty_entries in grouped_entries.values():
+            shuffled = list(difficulty_entries)
+            random_generator.shuffle(shuffled)
+            capped_entries.extend(shuffled[:max_examples_per_difficulty])
+
+        random_generator.shuffle(capped_entries)
+        return capped_entries
+
+    def _normalize_entries(self, entries: list[DatasetEntry]) -> list[DatasetEntry]:
+        if not self.merge_gh_into_f:
+            return entries
+
+        normalized_entries: list[DatasetEntry] = []
+        for entry in entries:
+            normalized_entry = copy.copy(entry)
+            difficulty = entry.difficulty.strip().upper()
+            if difficulty in {"G", "H"}:
+                normalized_entry.difficulty = "F"
+            normalized_entries.append(normalized_entry)
+        return normalized_entries
+
 
 class FrozenEmbeddingPipeline:
     def __init__(self, config: TrainingConfig) -> None:
@@ -310,40 +441,17 @@ class FrozenEmbeddingPipeline:
             validation_ratio=self.config.validation_ratio,
             random_seed=self.config.random_seed,
         )
-        train_dataset, validation_dataset, test_dataset, label_encoder, label_statistics = dataset_factory.build()
-
-        train_loader = EncodedProblemsDataLoader(
-            dataset=train_dataset,
-            batch_size=self.config.batch_size,
-            shuffle=True,
-            num_workers=self.config.num_workers,
+        dataset_factory.set_max_train_examples_per_difficulty(
+            self.config.max_train_examples_per_difficulty,
         )
-        validation_loader = EncodedProblemsDataLoader(
-            dataset=validation_dataset,
-            batch_size=self.config.batch_size,
-            shuffle=False,
-            num_workers=self.config.num_workers,
-        )
-        test_loader = EncodedProblemsDataLoader(
-            dataset=test_dataset,
-            batch_size=self.config.batch_size,
-            shuffle=False,
-            num_workers=self.config.num_workers,
-        )
+        dataset_factory.set_merge_gh_into_f(self.config.merge_gh_into_f)
+        train_base_dataset, validation_base_dataset, test_base_dataset, label_encoder, label_statistics = dataset_factory.build()
 
-        input_dim = train_dataset[0]["embedding"].numel()
-        model = FrozenEmbeddingClassifier(
-            input_dim=input_dim,
-            num_difficulties=len(label_encoder.difficulties),
-            num_tags=len(label_encoder.tags),
-            hidden_dim=self.config.hidden_dim,
-            dropout=self.config.dropout,
-        ).to(self.device)
-
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=self.config.learning_rate,
-            weight_decay=self.config.weight_decay,
+        model, train_loader, validation_loader, test_loader, input_dim, optimizer = self._build_training_components(
+            train_base_dataset=train_base_dataset,
+            validation_base_dataset=validation_base_dataset,
+            test_base_dataset=test_base_dataset,
+            label_encoder=label_encoder,
         )
 
         difficulty_class_weights = self._build_difficulty_class_weights(label_statistics)
@@ -352,6 +460,8 @@ class FrozenEmbeddingPipeline:
         best_validation_loss = float("inf")
         best_model_path = self.output_dir / "best_model.pt"
         history: list[dict[str, Any]] = []
+        best_epoch = 0
+        early_stopping_counter = 0
 
         for epoch in range(1, self.config.num_epochs + 1):
             train_metrics = self._run_epoch(
@@ -386,9 +496,21 @@ class FrozenEmbeddingPipeline:
                 f"val_tag_f1={validation_metrics['tags_micro_f1']:.4f}"
             )
 
-            if validation_metrics["loss"] < best_validation_loss:
+            if validation_metrics["loss"] <= best_validation_loss - self.config.early_stopping_min_delta:
                 best_validation_loss = validation_metrics["loss"]
+                best_epoch = epoch
+                early_stopping_counter = 0
                 torch.save(model.state_dict(), best_model_path)
+            else:
+                early_stopping_counter += 1
+
+            if early_stopping_counter >= self.config.early_stopping_patience:
+                print(
+                    f"Early stopping at epoch {epoch:02d} | "
+                    f"best_epoch={best_epoch:02d} "
+                    f"best_val_loss={best_validation_loss:.4f}"
+                )
+                break
 
         model.load_state_dict(torch.load(best_model_path, map_location=self.device))
         test_metrics = self._run_epoch(
@@ -403,12 +525,16 @@ class FrozenEmbeddingPipeline:
         metadata = {
             "config": asdict(self.config),
             "running_mode": self.running_mode.value,
+            "merge_gh_into_f": self.config.merge_gh_into_f,
+            "unfreeze_top_n_transformer_layers": self.config.unfreeze_top_n_transformer_layers,
             "input_dim": input_dim,
             "label_encoder": label_encoder.to_dict(),
             "label_statistics": label_statistics.to_dict(),
             "difficulty_class_weights": difficulty_class_weights.detach().cpu().tolist(),
             "tag_pos_weights": tag_pos_weights.detach().cpu().tolist(),
             "best_validation_loss": best_validation_loss,
+            "best_epoch": best_epoch,
+            "stopped_epoch": len(history),
             "history": history,
             "test_metrics": test_metrics,
         }
@@ -463,13 +589,24 @@ class FrozenEmbeddingPipeline:
             metadata = json.load(input_file)
 
         label_encoder = ProblemLabelEncoder.from_dict(metadata["label_encoder"])
-        model = FrozenEmbeddingClassifier(
-            input_dim=metadata["input_dim"],
-            num_difficulties=len(label_encoder.difficulties),
-            num_tags=len(label_encoder.tags),
-            hidden_dim=metadata["config"]["hidden_dim"],
-            dropout=metadata["config"]["dropout"],
-        ).to(self.device)
+        if metadata.get("unfreeze_top_n_transformer_layers", 0) > 0:
+            self.embedding_model.freeze_all_parameters()
+            self.embedding_model.unfreeze_top_transformer_layers(metadata["unfreeze_top_n_transformer_layers"])
+            model = TransformerFineTuningClassifier(
+                embedding_model=self.embedding_model,
+                num_difficulties=len(label_encoder.difficulties),
+                num_tags=len(label_encoder.tags),
+                hidden_dim=metadata["config"]["hidden_dim"],
+                dropout=metadata["config"]["dropout"],
+            ).to(self.device)
+        else:
+            model = FrozenEmbeddingClassifier(
+                input_dim=metadata["input_dim"],
+                num_difficulties=len(label_encoder.difficulties),
+                num_tags=len(label_encoder.tags),
+                hidden_dim=metadata["config"]["hidden_dim"],
+                dropout=metadata["config"]["dropout"],
+            ).to(self.device)
         model.load_state_dict(torch.load(weights_path, map_location=self.device))
         model.eval()
         return model, metadata, label_encoder
@@ -480,15 +617,31 @@ class FrozenEmbeddingPipeline:
         label_encoder: ProblemLabelEncoder,
     ) -> EncodedProblemsDataLoader:
         entries = self.dataset_reader.retrieve_split_data(split_name)
+        if self.config.merge_gh_into_f:
+            entries = ProblemDatasetFactory(
+                dataset_reader=self.dataset_reader,
+                embedding_model=self.embedding_model,
+                running_mode=self.running_mode,
+                validation_ratio=self.config.validation_ratio,
+                random_seed=self.config.random_seed,
+            )._normalize_entries(entries)
         dataset = ProgrammingProblemsDataset(
             dataset_reader=self.dataset_reader,
             is_train=False,
             running_mode=self.running_mode,
             embedding_model=self.embedding_model,
-            include_embeddings=True,
+            include_embeddings=self.config.unfreeze_top_n_transformer_layers == 0,
             entries=entries,
             sample_random_solution=False,
         )
+        if self.config.unfreeze_top_n_transformer_layers > 0:
+            text_dataset = TextProblemsDataset(base_dataset=dataset, label_encoder=label_encoder)
+            return TextProblemsDataLoader(
+                dataset=text_dataset,
+                batch_size=self.config.batch_size,
+                shuffle=False,
+                num_workers=self.config.num_workers,
+            )
         encoded_dataset = EncodedProblemsDataset(base_dataset=dataset, label_encoder=label_encoder)
         return EncodedProblemsDataLoader(
             dataset=encoded_dataset,
@@ -517,9 +670,12 @@ class FrozenEmbeddingPipeline:
         total_tag_tp = 0.0
         total_tag_fp = 0.0
         total_tag_fn = 0.0
+        total_tag_exact_match = 0
+        per_class_total = [0 for _ in range(model.difficulty_head.out_features)]
+        per_class_correct = [0 for _ in range(model.difficulty_head.out_features)]
+        per_class_predicted = [0 for _ in range(model.difficulty_head.out_features)]
 
         for batch in data_loader:
-            embeddings = batch["embedding"].to(self.device)
             difficulty_labels = batch["difficulty_label"].to(self.device)
             tag_labels = batch["tag_labels"].to(self.device)
 
@@ -527,7 +683,7 @@ class FrozenEmbeddingPipeline:
                 optimizer.zero_grad()
 
             with torch.set_grad_enabled(is_training):
-                outputs = model(embeddings)
+                outputs = self._forward_model(model, batch)
                 difficulty_loss = self._compute_difficulty_loss(
                     logits=outputs["difficulty_logits"],
                     labels=difficulty_labels,
@@ -547,29 +703,184 @@ class FrozenEmbeddingPipeline:
                     loss.backward()
                     optimizer.step()
 
-            batch_size = embeddings.size(0)
+            batch_size = difficulty_labels.size(0)
             total_loss += float(loss.item()) * batch_size
             total_examples += batch_size
 
             difficulty_predictions = torch.argmax(outputs["difficulty_logits"], dim=1)
             total_correct_difficulty += int((difficulty_predictions == difficulty_labels).sum().item())
+            for label_value, pred_value in zip(difficulty_labels.tolist(), difficulty_predictions.tolist()):
+                per_class_total[label_value] += 1
+                per_class_predicted[pred_value] += 1
+                if label_value == pred_value:
+                    per_class_correct[label_value] += 1
 
             tag_predictions = (torch.sigmoid(outputs["tags_logits"]) >= self.config.tag_threshold).float()
             total_tag_tp += float((tag_predictions * tag_labels).sum().item())
             total_tag_fp += float((tag_predictions * (1.0 - tag_labels)).sum().item())
             total_tag_fn += float(((1.0 - tag_predictions) * tag_labels).sum().item())
+            total_tag_exact_match += int((tag_predictions == tag_labels).all(dim=1).sum().item())
 
         precision = total_tag_tp / (total_tag_tp + total_tag_fp) if (total_tag_tp + total_tag_fp) else 0.0
         recall = total_tag_tp / (total_tag_tp + total_tag_fn) if (total_tag_tp + total_tag_fn) else 0.0
         micro_f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+        difficulty_macro_f1 = self._compute_macro_f1(
+            true_counts=per_class_total,
+            predicted_counts=per_class_predicted,
+            true_positive_counts=per_class_correct,
+        )
+        per_class_accuracy = {
+            DIFFICULTY_ORDER[index] if index < len(DIFFICULTY_ORDER) else str(index): (
+                per_class_correct[index] / per_class_total[index] if per_class_total[index] else 0.0
+            )
+            for index in range(len(per_class_total))
+        }
+        per_class_support = {
+            DIFFICULTY_ORDER[index] if index < len(DIFFICULTY_ORDER) else str(index): per_class_total[index]
+            for index in range(len(per_class_total))
+        }
 
         return {
             "loss": total_loss / total_examples if total_examples else 0.0,
             "difficulty_accuracy": total_correct_difficulty / total_examples if total_examples else 0.0,
+            "difficulty_macro_f1": difficulty_macro_f1,
             "tags_micro_precision": precision,
             "tags_micro_recall": recall,
             "tags_micro_f1": micro_f1,
+            "tags_subset_accuracy": total_tag_exact_match / total_examples if total_examples else 0.0,
+            "difficulty_per_class_accuracy": per_class_accuracy,
+            "difficulty_per_class_support": per_class_support,
         }
+
+    def _build_training_components(
+        self,
+        train_base_dataset: ProgrammingProblemsDataset,
+        validation_base_dataset: ProgrammingProblemsDataset,
+        test_base_dataset: ProgrammingProblemsDataset,
+        label_encoder: ProblemLabelEncoder,
+    ) -> tuple[
+        nn.Module,
+        ProgrammingProblemsDataLoader,
+        ProgrammingProblemsDataLoader,
+        ProgrammingProblemsDataLoader,
+        int,
+        torch.optim.Optimizer,
+    ]:
+        if self.config.unfreeze_top_n_transformer_layers > 0:
+            self.embedding_model.freeze_all_parameters()
+            self.embedding_model.unfreeze_top_transformer_layers(
+                self.config.unfreeze_top_n_transformer_layers,
+            )
+            model = TransformerFineTuningClassifier(
+                embedding_model=self.embedding_model,
+                num_difficulties=len(label_encoder.difficulties),
+                num_tags=len(label_encoder.tags),
+                hidden_dim=self.config.hidden_dim,
+                dropout=self.config.dropout,
+            ).to(self.device)
+            train_loader = TextProblemsDataLoader(
+                dataset=TextProblemsDataset(train_base_dataset, label_encoder),
+                batch_size=self.config.batch_size,
+                shuffle=True,
+                num_workers=self.config.num_workers,
+            )
+            validation_loader = TextProblemsDataLoader(
+                dataset=TextProblemsDataset(validation_base_dataset, label_encoder),
+                batch_size=self.config.batch_size,
+                shuffle=False,
+                num_workers=self.config.num_workers,
+            )
+            test_loader = TextProblemsDataLoader(
+                dataset=TextProblemsDataset(test_base_dataset, label_encoder),
+                batch_size=self.config.batch_size,
+                shuffle=False,
+                num_workers=self.config.num_workers,
+            )
+            encoder_params = [param for param in self.embedding_model.model.parameters() if param.requires_grad]
+            head_params = [
+                param
+                for name, param in model.named_parameters()
+                if not name.startswith("embedding_model.model.") and param.requires_grad
+            ]
+            optimizer = torch.optim.AdamW(
+                [
+                    {"params": encoder_params, "lr": self.config.encoder_learning_rate},
+                    {"params": head_params, "lr": self.config.learning_rate},
+                ],
+                weight_decay=self.config.weight_decay,
+            )
+            return model, train_loader, validation_loader, test_loader, self.embedding_model.hidden_size, optimizer
+
+        embedding_dataset_train = ProgrammingProblemsDataset(
+            dataset_reader=train_base_dataset.dataset_reader,
+            is_train=train_base_dataset.is_train,
+            running_mode=train_base_dataset.running_mode,
+            embedding_model=self.embedding_model,
+            include_embeddings=True,
+            entries=train_base_dataset.entries,
+            sample_random_solution=train_base_dataset.sample_random_solution,
+        )
+        embedding_dataset_validation = ProgrammingProblemsDataset(
+            dataset_reader=validation_base_dataset.dataset_reader,
+            is_train=validation_base_dataset.is_train,
+            running_mode=validation_base_dataset.running_mode,
+            embedding_model=self.embedding_model,
+            include_embeddings=True,
+            entries=validation_base_dataset.entries,
+            sample_random_solution=validation_base_dataset.sample_random_solution,
+        )
+        embedding_dataset_test = ProgrammingProblemsDataset(
+            dataset_reader=test_base_dataset.dataset_reader,
+            is_train=test_base_dataset.is_train,
+            running_mode=test_base_dataset.running_mode,
+            embedding_model=self.embedding_model,
+            include_embeddings=True,
+            entries=test_base_dataset.entries,
+            sample_random_solution=test_base_dataset.sample_random_solution,
+        )
+        train_dataset = EncodedProblemsDataset(embedding_dataset_train, label_encoder)
+        validation_dataset = EncodedProblemsDataset(embedding_dataset_validation, label_encoder)
+        test_dataset = EncodedProblemsDataset(embedding_dataset_test, label_encoder)
+
+        train_loader = EncodedProblemsDataLoader(
+            dataset=train_dataset,
+            batch_size=self.config.batch_size,
+            shuffle=True,
+            num_workers=self.config.num_workers,
+        )
+        validation_loader = EncodedProblemsDataLoader(
+            dataset=validation_dataset,
+            batch_size=self.config.batch_size,
+            shuffle=False,
+            num_workers=self.config.num_workers,
+        )
+        test_loader = EncodedProblemsDataLoader(
+            dataset=test_dataset,
+            batch_size=self.config.batch_size,
+            shuffle=False,
+            num_workers=self.config.num_workers,
+        )
+
+        input_dim = train_dataset[0]["embedding"].numel()
+        model = FrozenEmbeddingClassifier(
+            input_dim=input_dim,
+            num_difficulties=len(label_encoder.difficulties),
+            num_tags=len(label_encoder.tags),
+            hidden_dim=self.config.hidden_dim,
+            dropout=self.config.dropout,
+        ).to(self.device)
+
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=self.config.learning_rate,
+            weight_decay=self.config.weight_decay,
+        )
+        return model, train_loader, validation_loader, test_loader, input_dim, optimizer
+
+    def _forward_model(self, model: nn.Module, batch: dict[str, Any]) -> dict[str, torch.Tensor]:
+        if self.config.unfreeze_top_n_transformer_layers > 0:
+            return model(batch["text"])
+        return model(batch["embedding"].to(self.device))
 
     def _save_artifacts(self, model: FrozenEmbeddingClassifier, metadata: dict[str, Any]) -> None:
         metadata_path = self.output_dir / "metadata.json"
@@ -621,3 +932,21 @@ class FrozenEmbeddingPipeline:
         if self.config.tags_loss_type == "weighted_bce":
             return nn.functional.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weights)
         return nn.functional.binary_cross_entropy_with_logits(logits, labels)
+
+    @staticmethod
+    def _compute_macro_f1(
+        true_counts: list[int],
+        predicted_counts: list[int],
+        true_positive_counts: list[int],
+    ) -> float:
+        per_class_f1 = []
+        for true_count, predicted_count, true_positive_count in zip(
+            true_counts,
+            predicted_counts,
+            true_positive_counts,
+        ):
+            precision = true_positive_count / predicted_count if predicted_count else 0.0
+            recall = true_positive_count / true_count if true_count else 0.0
+            f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+            per_class_f1.append(f1)
+        return sum(per_class_f1) / len(per_class_f1) if per_class_f1 else 0.0
